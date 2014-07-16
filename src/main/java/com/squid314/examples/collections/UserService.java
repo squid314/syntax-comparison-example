@@ -17,6 +17,7 @@ public class UserService {
      * We present several use cases for comparison:
      *
      * - Find user named "John"
+     * - Determine if there is an admin in the set
      * - Find all Roles of non-admin Users which have a name containing the string "foo".
      * - Find all Groups of admin Users which have a name beginning with the string "c".
      *
@@ -37,6 +38,10 @@ public class UserService {
         public static User findJohn(List<User> users) {
             for (User user : users) {
                 if (user.getUsername().equals("John")) {
+                    // We use a return here to implement a short-circuit operation so that we don't continue searching if there is one which matches. A naive
+                    // implementation might assign user to a local variable and continue examining the elements of the list. Not only would this perform a
+                    // large number of tests which were unnecessary, but it would also return the last element which matched instead of the first. This may
+                    // be a problem in some situations.
                     return user;
                 }
             }
@@ -45,6 +50,15 @@ public class UserService {
              * indicating that it was not possible to find the user? The answer may depend on whether it is considered an error for the indicated user to not
              * be present in the set passed in. */
             return null;
+        }
+
+        public static boolean anyAdmins(List<User> users) {
+            for (User user : users) {
+                if (user.isAdmin()) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         public static List<Role> nonAdminFooRoles(List<User> users) {
@@ -116,10 +130,15 @@ public class UserService {
      */
     public static class Guava {
         // Optional is a pattern which prevents a null from being used in normal operations (preventing a NullPointerException) and allowing it to be obvious
-        // when a value "may or may not be present" and when a value "must be present or there is an error"
+        // when a value "may or may not be present" and when a value "must be present or there is an error".
         public static Optional<User> findJohn(List<User> users) {
-            // search the users for a match
+            // Search the users for a match. tryFind is a short-circuit operation which will stop searching as soon as a match is found.
             return Iterables.tryFind(users, withUsername("John"));
+        }
+
+        public static boolean anyAdmins(List<User> users) {
+            // Optional will tell us if there is a value which matches by asking if the value "is present".
+            return Iterables.tryFind(users, isAdmin).isPresent();
         }
 
         public static Collection<Role> nonAdminFooRoles(List<User> users) {
@@ -236,6 +255,11 @@ public class UserService {
             return users.stream()
                     .filter(user -> user.getUsername().equals(name))
                     .findFirst();
+        }
+
+        public static boolean anyAdmins(List<User> users) {
+            // As with Guava, this is a short-circuit operation which stops looking as soon as it finds one which matches.
+            return users.stream().anyMatch(User::isAdmin);
         }
 
         public static Stream<Role> nonAdminFooRoles(List<User> users) {

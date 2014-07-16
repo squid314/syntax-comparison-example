@@ -298,6 +298,8 @@ public class UserService {
 
         public static Stream<Role> nonAdminFooRoles(List<User> users) {
             return users.stream()
+                    // This could also be done by casting a User::isAdmin method reference to a Predicate<User> and calling Predicate#negate() on it.
+                    //.filter(((java.util.function.Predicate<User>) User::isAdmin).negate())
                     .filter(user -> !user.isAdmin())
                     .map(User::getRole)
                     .filter(role -> role.getName().contains("foo"));

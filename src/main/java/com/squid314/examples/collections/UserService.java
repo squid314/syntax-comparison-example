@@ -19,6 +19,7 @@ public class UserService {
      * - Find user named "John"
      * - Determine if there is an admin in the set
      * - Find all admin usernames
+     * - Does the provided set of Users contain any with a Role named "bar".
      * - Find all Roles of non-admin Users which have a name containing the string "foo".
      * - Find all Groups of admin Users which have a name beginning with the string "c".
      *
@@ -72,6 +73,15 @@ public class UserService {
             }
 
             return result;
+        }
+
+        public static boolean anyRoleBarUsers(List<User> users) {
+            for (User user : users) {
+                if (user.getRole().getName().equals("bar")) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         public static List<Role> nonAdminFooRoles(List<User> users) {
@@ -159,6 +169,19 @@ public class UserService {
             return Collections2.transform(admins, toUsername);
         }
 
+        public static boolean anyRoleBarUsers(List<User> users) {
+            Collection<Role> roles = Collections2.transform(users, toRole);
+            Collection<String> roleNames = Collections2.transform(roles, roleToName);
+            // This Predicate doesn't seem particularly reusable, so we will just inline it here.
+            Predicate<String> isBar = new Predicate<String>() {
+                @Override
+                public boolean apply(String roleName) {
+                    return roleName.equals("bar");
+                }
+            };
+            return Iterables.tryFind(roleNames, isBar).isPresent();
+        }
+
         public static Collection<Role> nonAdminFooRoles(List<User> users) {
             // This is what the operation looks like without local variables for intermediate steps and using static method imports
             //return filter(transform(filter(users, not(isAdmin)), toRole), contains("foo"));
@@ -207,6 +230,12 @@ public class UserService {
             @Override
             public String apply(User user) {
                 return user.getUsername();
+            }
+        };
+        private static final Function<? super Role, String> roleToName = new Function<Role, String>() {
+            @Override
+            public String apply(Role role) {
+                return role.getName();
             }
         };
 
@@ -294,6 +323,17 @@ public class UserService {
                     // suggestions or documentation on whether they will generate different bytecode.
                     .filter(User::isAdmin)
                     .map(User::getUsername);
+        }
+
+        public static boolean anyRoleBarUsers(List<User> users) {
+            return users.stream()
+                    .map(User::getRole)
+                    .map(Role::getName)
+                    // We can use a method of an instance we hold to create a Function or Predicate just as we can use a generic method. As long as the
+                    // method can be translated into the FunctionalInterface needed. If we need a {@code Role Function#apply(User)}, we can use the 0-argument
+                    // instance method User#getRole() which will use the Function#apply(User) argument as this of User#getRole(). Similarly, we can use the
+                    // 1-argument instance method String#equals(Object) of an instance we control to create a Predicate.
+                    .anyMatch("bar"::equals);
         }
 
         public static Stream<Role> nonAdminFooRoles(List<User> users) {

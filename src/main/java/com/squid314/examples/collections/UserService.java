@@ -1,7 +1,9 @@
 package com.squid314.examples.collections;
 
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
+import com.google.common.collect.Iterables;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +16,7 @@ public class UserService {
     /*
      * We present several use cases for comparison:
      *
+     * - Find user named "John"
      * - Find all Roles of non-admin Users which have a name containing the string "foo".
      * - Find all Groups of admin Users which have a name beginning with the string "c".
      *
@@ -31,6 +34,19 @@ public class UserService {
      *   - difficult to refactor
      */
     public static class Java5 {
+        public static User findJohn(List<User> users) {
+            for (User user : users) {
+                if (user.getUsername().equals("John")) {
+                    return user;
+                }
+            }
+
+            /* Debate exists about what should be done here. Should you return null indicating the user was not found? Should you throw an exception
+             * indicating that it was not possible to find the user? The answer may depend on whether it is considered an error for the indicated user to not
+             * be present in the set passed in. */
+            return null;
+        }
+
         public static List<Role> nonAdminFooRoles(List<User> users) {
             // Generally we start by initializing a new collection to hold the result.
             ArrayList<Role> resultRoles = new ArrayList<>();
@@ -99,6 +115,13 @@ public class UserService {
      *     new ArrayList<String>(transform(filter(original, condition), extraction)).
      */
     public static class Guava {
+        // Optional is a pattern which prevents a null from being used in normal operations (preventing a NullPointerException) and allowing it to be obvious
+        // when a value "may or may not be present" and when a value "must be present or there is an error"
+        public static Optional<User> findJohn(List<User> users) {
+            // search the users for a match
+            return Iterables.tryFind(users, withUsername("John"));
+        }
+
         public static Iterable<Role> nonAdminFooRoles(List<User> users) {
             // This is what the operation looks like without local variables for intermediate steps
             //return filter(transform(filter(users, not(isAdmin)), toRole), contains("foo"));
@@ -141,6 +164,21 @@ public class UserService {
                 return user.getGroups();
             }
         };
+
+        /**
+         * Produces a {@link Predicate} to test if a {@link User}'s {@link User#getUsername() username} matches the provided string.
+         *
+         * @param name the name for which to test the {@link User#getUsername()}.
+         * @return {@link Predicate} to perform the test.
+         */
+        private static Predicate<User> withUsername(final String name) {
+            return new Predicate<User>() {
+                @Override
+                public boolean apply(User user) {
+                    return user.getUsername().equals(name);
+                }
+            };
+        }
 
         /**
          * Produces a {@link Predicate} to test if a {@link Group}'s {@link Group#name name} begins with the specified {@code prefix}.
@@ -188,6 +226,17 @@ public class UserService {
      *   - Like the Guava library, the Stream API is "laziness-seeking" and has the same benefits/drawbacks mentioned above.
      */
     public static class Java8 {
+        public static java.util.Optional<User> findJohn(List<User> users) {
+            // Note: lambdas require any used variables to be final; however, the compiler is able to detect if variables are "effectively final" and
+            // automatically makes them final as necessary. Try replacing "name" in the lambda with "nonFinalName" and see what happens.
+            String nonFinalName = "Jo";
+            nonFinalName += "hn";
+            String name = nonFinalName;
+            return users.stream()
+                    .filter(user -> user.getUsername().equals(name))
+                    .findFirst();
+        }
+
         public static Stream<Role> nonAdminFooRoles(List<User> users) {
             return users.stream()
                     .filter(user -> !user.isAdmin())

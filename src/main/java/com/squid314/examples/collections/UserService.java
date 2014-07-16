@@ -3,14 +3,14 @@ package com.squid314.examples.collections;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
+import com.google.common.collect.Collections2;
 import com.google.common.collect.Iterables;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Stream;
-
-import static com.google.common.base.Predicates.not;
-import static com.google.common.collect.Iterables.*;
 
 public class UserService {
     /*
@@ -122,23 +122,24 @@ public class UserService {
             return Iterables.tryFind(users, withUsername("John"));
         }
 
-        public static Iterable<Role> nonAdminFooRoles(List<User> users) {
-            // This is what the operation looks like without local variables for intermediate steps
+        public static Collection<Role> nonAdminFooRoles(List<User> users) {
+            // This is what the operation looks like without local variables for intermediate steps and using static method imports
             //return filter(transform(filter(users, not(isAdmin)), toRole), contains("foo"));
 
             // first filter the list to non-admins
-            Iterable<User> nonAdmins = filter(users, not(isAdmin));
+            Collection<User> nonAdmins = Collections2.filter(users, Predicates.not(isAdmin));
             // extract the Role of the User objects
-            Iterable<Role> roles = transform(nonAdmins, toRole);
+            Collection<Role> roles = Collections2.transform(nonAdmins, toRole);
             // filter the roles to ones matching the "foo" criteria
-            return filter(roles, contains("foo"));
+            return Collections2.filter(roles, contains("foo"));
         }
 
         public static Iterable<Group> adminCGroups(List<User> users) {
-            Iterable<User> admins = filter(users, isAdmin);
-            Iterable<List<Group>> groupsOfAdminGroups = transform(admins, toGroups);
-            Iterable<Group> adminGroups = concat(groupsOfAdminGroups);
-            return filter(adminGroups, startsWith("c"));
+            Collection<User> admins = Collections2.filter(users, isAdmin);
+            Collection<List<Group>> groupsOfAdminGroups = Collections2.transform(admins, toGroups);
+            // There isn't an API for joining Collections, so we just join the Iterables instead. In most cases this will be fine.
+            Iterable<Group> adminGroups = Iterables.concat(groupsOfAdminGroups);
+            return Iterables.filter(adminGroups, startsWith("c"));
         }
 
         // Utility constants and methods

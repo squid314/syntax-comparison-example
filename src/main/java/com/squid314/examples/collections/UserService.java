@@ -63,7 +63,7 @@ public class UserService {
 
         public static List<Role> nonAdminFooRoles(List<User> users) {
             // Generally we start by initializing a new collection to hold the result.
-            ArrayList<Role> resultRoles = new ArrayList<>();
+            ArrayList<Role> resultRoles = new ArrayList<Role>();
 
             // Loop over the users
             for (User user : users) {
@@ -170,14 +170,14 @@ public class UserService {
                 return user.isAdmin();
             }
         };
-        /** {@link Function} to extract the {@link User#role} from a {@link User}. */
+        /** {@link Function} to extract the {@link User#getRole()} from a {@link User}. */
         private static final Function<? super User, Role> toRole = new Function<User, Role>() {
             @Override
             public Role apply(User user) {
                 return user.getRole();
             }
         };
-        /** {@link Function} to extract the {@link User#groups} from a {@link User}. */
+        /** {@link Function} to extract the {@link User#getGroups()} from a {@link User}. */
         private static final Function<? super User, List<Group>> toGroups = new Function<User, List<Group>>() {
             @Override
             public List<Group> apply(User user) {
@@ -191,7 +191,7 @@ public class UserService {
          * @param name the name for which to test the {@link User#getUsername()}.
          * @return {@link Predicate} to perform the test.
          */
-        private static Predicate<User> withUsername(final String name) {
+        private static Predicate<? super User> withUsername(final String name) {
             return new Predicate<User>() {
                 @Override
                 public boolean apply(User user) {

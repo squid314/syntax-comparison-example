@@ -18,6 +18,7 @@ public class UserService {
      *
      * - Find user named "John"
      * - Determine if there is an admin in the set
+     * - Find all admin usernames
      * - Find all Roles of non-admin Users which have a name containing the string "foo".
      * - Find all Groups of admin Users which have a name beginning with the string "c".
      *
@@ -59,6 +60,18 @@ public class UserService {
                 }
             }
             return false;
+        }
+
+        public static List<String> adminUsernames(List<User> users) {
+            ArrayList<String> result = new ArrayList<String>();
+
+            for (User user : users) {
+                if (user.isAdmin()) {
+                    result.add(user.getUsername());
+                }
+            }
+
+            return result;
         }
 
         public static List<Role> nonAdminFooRoles(List<User> users) {
@@ -141,6 +154,11 @@ public class UserService {
             return Iterables.tryFind(users, isAdmin).isPresent();
         }
 
+        public static Collection<String> adminUsernames(List<User> users) {
+            Collection<User> admins = Collections2.filter(users, isAdmin);
+            return Collections2.transform(admins, toUsername);
+        }
+
         public static Collection<Role> nonAdminFooRoles(List<User> users) {
             // This is what the operation looks like without local variables for intermediate steps and using static method imports
             //return filter(transform(filter(users, not(isAdmin)), toRole), contains("foo"));
@@ -182,6 +200,13 @@ public class UserService {
             @Override
             public List<Group> apply(User user) {
                 return user.getGroups();
+            }
+        };
+        /** {@link Function} to extract the {@link User#getUsername()} from a {@link User}. */
+        private static final Function<? super User, String> toUsername = new Function<User, String>() {
+            @Override
+            public String apply(User user) {
+                return user.getUsername();
             }
         };
 
@@ -259,7 +284,16 @@ public class UserService {
 
         public static boolean anyAdmins(List<User> users) {
             // As with Guava, this is a short-circuit operation which stops looking as soon as it finds one which matches.
-            return users.stream().anyMatch(User::isAdmin);
+            return users.stream().anyMatch(user -> user.isAdmin());
+        }
+
+        public static Stream<String> adminUsernames(List<User> users) {
+            return users.stream()
+                    // In anyAdmins, we used a simple lambda to determine if the user is an admin or not. Here we use a "method reference" which does the
+                    // exact same thing (they are equivalent). The difference between them is largely personal preference; I can't find best practice
+                    // suggestions or documentation on whether they will generate different bytecode.
+                    .filter(User::isAdmin)
+                    .map(User::getUsername);
         }
 
         public static Stream<Role> nonAdminFooRoles(List<User> users) {

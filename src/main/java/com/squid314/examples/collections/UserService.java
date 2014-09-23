@@ -5,12 +5,13 @@ import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Collections2;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 public class UserService {
     /*
@@ -129,18 +130,19 @@ public class UserService {
     }
 
     /*
-     * Java 1.5 using Google Guava library; functional style
+     * Java 1.5 using Google Guava library on java.util.* items; functional style
      *
      * Pros:
      *   - easier to read what operations are occurring, especially when using variables or methods to provide Functions and Predicates
      *   - generally easier to refactor
      *   - functional aspect allows certain logic components to be refactored and be pluggable instead of hard-coded
+     *   - operates directly on java.util.* Collections Framework objects making it very simple to interoperate with other libraries
      * Cons:
      *   - depends on external library
-     *   - not easy to read left-to-right due to static methods, especially when applying several operations
      *   - requires large amounts of boilerplate to provide the functional operations (specifically the anonymous inner classes wrapping
      *     the actual logic)
      *   - if not extracting Functions/Predicates to variables/methods, inline classes make code harder to read, rather than easier
+     *   - not easy to read left-to-right due to static methods, especially when applying several operations
      * Notes:
      *   - Guava generally uses lazy evaluation when applying filters/transforms to collections. This can be both good and bad in different
      *     situations. It allows all modifications of the result set to be built up before any code is actually executed. This can save a
@@ -201,87 +203,73 @@ public class UserService {
             Iterable<Group> adminGroups = Iterables.concat(groupsOfAdminGroups);
             return Iterables.filter(adminGroups, startsWith("c"));
         }
+    }
 
-        // Utility constants and methods
-
-        /** {@link Predicate} to test if a user is an admin. */
-        private static final Predicate<? super User> isAdmin = new Predicate<User>() {
-            @Override
-            public boolean apply(User user) {
-                return user.isAdmin();
-            }
-        };
-        /** {@link Function} to extract the {@link User#getRole()} from a {@link User}. */
-        private static final Function<? super User, Role> toRole = new Function<User, Role>() {
-            @Override
-            public Role apply(User user) {
-                return user.getRole();
-            }
-        };
-        /** {@link Function} to extract the {@link User#getGroups()} from a {@link User}. */
-        private static final Function<? super User, List<Group>> toGroups = new Function<User, List<Group>>() {
-            @Override
-            public List<Group> apply(User user) {
-                return user.getGroups();
-            }
-        };
-        /** {@link Function} to extract the {@link User#getUsername()} from a {@link User}. */
-        private static final Function<? super User, String> toUsername = new Function<User, String>() {
-            @Override
-            public String apply(User user) {
-                return user.getUsername();
-            }
-        };
-        private static final Function<? super Role, String> roleToName = new Function<Role, String>() {
-            @Override
-            public String apply(Role role) {
-                return role.getName();
-            }
-        };
-
-        /**
-         * Produces a {@link Predicate} to test if a {@link User}'s {@link User#getUsername() username} matches the provided string.
-         *
-         * @param name the name for which to test the {@link User#getUsername()}.
-         * @return {@link Predicate} to perform the test.
-         */
-        private static Predicate<? super User> withUsername(final String name) {
-            return new Predicate<User>() {
-                @Override
-                public boolean apply(User user) {
-                    return user.getUsername().equals(name);
-                }
-            };
+    /*
+     * Java 1.5 using Google Guava library and Java 8-like classes
+     *
+     * Pros:
+     *   - (first 3 pros of preceding Guava case)
+     *   - FluentIterable makes it easier to read the steps which are being applied
+     *   - easy to export from Guava types to java.util.* types (or compatible types)
+     *   - provides obvious handle on the string of lazy-evaluation operations in the form of the FluentIterable; this makes it easy to
+     *     notice that the current object is a not-complete state.
+     * Cons:
+     *   - (first 3 cons of preceding Guava case)
+     *   - doesn't use java.util.* types, making it harder to interoperate with other libraries, potentially requiring many additional
+     *     toList (or similar) calls
+     * Notes:
+     *   - As in preceding Guava case, lazy evaluation *can* cause problems. However, if the libraries you write directly return the
+     *     intermediary FluentIterable (not as done here), it is obvious that the object a person is using is actually a lazy operation
+     *     chain and they can then choose to act on that knowledge as they see fit.
+     */
+    public static class Guava_Fluent {
+        public static Optional<User> findJohn(List<User> users) {
+            // Wrap as a FluentIterable then search
+            return FluentIterable.from(users).firstMatch(withUsername("John"));
+            // This could also be written as...
+            // return FluentIterable.from(users).filter(withUsername("John")).first();
         }
 
-        /**
-         * Produces a {@link Predicate} to test if a {@link Group}'s {@link Group#name name} begins with the specified {@code prefix}.
-         *
-         * @param prefix the prefix for which to test the {@link Group#name}.
-         * @return {@link Predicate} to perform the test.
-         */
-        private static Predicate<? super Group> startsWith(final String prefix) {
-            return new Predicate<Group>() {
-                @Override
-                public boolean apply(Group group) {
-                    return group.getName().startsWith(prefix);
-                }
-            };
+        public static boolean anyAdmins(List<User> users) {
+            return FluentIterable.from(users).firstMatch(isAdmin).isPresent();
         }
 
-        /**
-         * Produces a {@link Predicate} to test if a {@link Role}'s {@link Role#name name} contains the specified string.
-         *
-         * @param s the string for which to test the {@link Role#name}.
-         * @return {@link Predicate} to perform the test.
-         */
-        private static Predicate<? super Role> contains(final String s) {
-            return new Predicate<Role>() {
+        public static Collection<String> adminUsernames(List<User> users) {
+            // Reasonably easy to read from left to right what is actually happening to build the result.
+            return FluentIterable.from(users)
+                    .filter(isAdmin)
+                    .transform(toUsername)
+                    .toList();
+        }
+
+        public static boolean anyRoleBarUsers(List<User> users) {
+            Predicate<String> isBar = new Predicate<String>() {
                 @Override
-                public boolean apply(Role role) {
-                    return role.getName().contains(s);
+                public boolean apply(String roleName) {
+                    return roleName.equals("bar");
                 }
             };
+            return FluentIterable.from(users)
+                    .transform(toRole)
+                    .transform(roleToName)
+                    .firstMatch(isBar).isPresent();
+        }
+
+        public static Collection<Role> nonAdminFooRoles(List<User> users) {
+            return FluentIterable.from(users)
+                    .filter(Predicates.not(isAdmin))
+                    .transform(toRole)
+                    .filter(contains("foo"))
+                    .toList();
+        }
+
+        public static Collection<Group> adminCGroups(List<User> users) {
+            return FluentIterable.from(users)
+                    .filter(isAdmin)
+                    .transformAndConcat(toGroups)
+                    .filter(startsWith("c"))
+                    .toList();
         }
     }
 
@@ -316,13 +304,14 @@ public class UserService {
             return users.stream().anyMatch(user -> user.isAdmin());
         }
 
-        public static Stream<String> adminUsernames(List<User> users) {
+        public static Collection<String> adminUsernames(List<User> users) {
             return users.stream()
                     // In anyAdmins, we used a simple lambda to determine if the user is an admin or not. Here we use a "method reference" which does the
                     // exact same thing (they are equivalent). The difference between them is largely personal preference; I can't find best practice
                     // suggestions or documentation on whether they will generate different bytecode.
                     .filter(User::isAdmin)
-                    .map(User::getUsername);
+                    .map(User::getUsername)
+                    .collect(Collectors.toList());
         }
 
         public static boolean anyRoleBarUsers(List<User> users) {
@@ -336,20 +325,105 @@ public class UserService {
                     .anyMatch("bar"::equals);
         }
 
-        public static Stream<Role> nonAdminFooRoles(List<User> users) {
+        public static Collection<Role> nonAdminFooRoles(List<User> users) {
             return users.stream()
                     // This could also be done by casting a User::isAdmin method reference to a Predicate<User> and calling Predicate#negate() on it.
                     //.filter(((java.util.function.Predicate<User>) User::isAdmin).negate())
                     .filter(user -> !user.isAdmin())
                     .map(User::getRole)
-                    .filter(role -> role.getName().contains("foo"));
+                    .filter(role -> role.getName().contains("foo"))
+                    .collect(Collectors.toList());
         }
 
-        public static Stream<Group> adminCGroups(List<User> users) {
+        public static Collection<Group> adminCGroups(List<User> users) {
             return users.stream()
                     .filter(User::isAdmin)
                     .flatMap(user -> user.getGroups().stream())
-                    .filter(group -> group.getName().startsWith("c"));
+                    .filter(group -> group.getName().startsWith("c"))
+                    .collect(Collectors.toList());
         }
+    }
+
+
+    // Utility constants and methods
+
+    /** {@link Predicate} to test if a user is an admin. */
+    private static final Predicate<? super User> isAdmin = new Predicate<User>() {
+        @Override
+        public boolean apply(User user) {
+            return user.isAdmin();
+        }
+    };
+    /** {@link Function} to extract the {@link User#getRole()} from a {@link User}. */
+    private static final Function<? super User, Role> toRole = new Function<User, Role>() {
+        @Override
+        public Role apply(User user) {
+            return user.getRole();
+        }
+    };
+    /** {@link Function} to extract the {@link User#getGroups()} from a {@link User}. */
+    private static final Function<? super User, List<Group>> toGroups = new Function<User, List<Group>>() {
+        @Override
+        public List<Group> apply(User user) {
+            return user.getGroups();
+        }
+    };
+    /** {@link Function} to extract the {@link User#getUsername()} from a {@link User}. */
+    private static final Function<? super User, String> toUsername = new Function<User, String>() {
+        @Override
+        public String apply(User user) {
+            return user.getUsername();
+        }
+    };
+    private static final Function<? super Role, String> roleToName = new Function<Role, String>() {
+        @Override
+        public String apply(Role role) {
+            return role.getName();
+        }
+    };
+
+    /**
+     * Produces a {@link Predicate} to test if a {@link User}'s {@link User#getUsername() username} matches the provided string.
+     *
+     * @param name the name for which to test the {@link User#getUsername()}.
+     * @return {@link Predicate} to perform the test.
+     */
+    private static Predicate<? super User> withUsername(final String name) {
+        return new Predicate<User>() {
+            @Override
+            public boolean apply(User user) {
+                return user.getUsername().equals(name);
+            }
+        };
+    }
+
+    /**
+     * Produces a {@link Predicate} to test if a {@link Group}'s {@link Group#name name} begins with the specified {@code prefix}.
+     *
+     * @param prefix the prefix for which to test the {@link Group#name}.
+     * @return {@link Predicate} to perform the test.
+     */
+    private static Predicate<? super Group> startsWith(final String prefix) {
+        return new Predicate<Group>() {
+            @Override
+            public boolean apply(Group group) {
+                return group.getName().startsWith(prefix);
+            }
+        };
+    }
+
+    /**
+     * Produces a {@link Predicate} to test if a {@link Role}'s {@link Role#name name} contains the specified string.
+     *
+     * @param s the string for which to test the {@link Role#name}.
+     * @return {@link Predicate} to perform the test.
+     */
+    private static Predicate<? super Role> contains(final String s) {
+        return new Predicate<Role>() {
+            @Override
+            public boolean apply(Role role) {
+                return role.getName().contains(s);
+            }
+        };
     }
 }
